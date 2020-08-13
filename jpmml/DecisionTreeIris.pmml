@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<PMML xmlns="http://www.dmg.org/PMML-4_4" xmlns:data="http://jpmml.org/jpmml-model/InlineTable" version="4.3">
+	<Header>
+		<Application name="JPMML-SparkML" version="1.6-SNAPSHOT"/>
+		<Timestamp>2020-08-12T08:40:11Z</Timestamp>
+	</Header>
+	<DataDictionary>
+		<DataField name="Species" optype="categorical" dataType="string">
+			<Value value="setosa"/>
+			<Value value="versicolor"/>
+			<Value value="virginica"/>
+		</DataField>
+		<DataField name="Sepal_Width" optype="continuous" dataType="double"/>
+		<DataField name="Petal_Length" optype="continuous" dataType="double"/>
+		<DataField name="Petal_Width" optype="continuous" dataType="double"/>
+	</DataDictionary>
+	<TransformationDictionary/>
+	<TreeModel functionName="classification" missingValueStrategy="nullPrediction">
+		<MiningSchema>
+			<MiningField name="Species" usageType="target"/>
+			<MiningField name="Sepal_Width"/>
+			<MiningField name="Petal_Length"/>
+			<MiningField name="Petal_Width"/>
+		</MiningSchema>
+		<Output>
+			<OutputField name="pmml(prediction)" optype="categorical" dataType="string" isFinalResult="false"/>
+			<OutputField name="prediction" optype="continuous" dataType="double" feature="transformedValue">
+				<MapValues outputColumn="data:output" dataType="double">
+					<FieldColumnPair field="pmml(prediction)" column="data:input"/>
+					<InlineTable>
+						<row>
+							<data:input>setosa</data:input>
+							<data:output>0</data:output>
+						</row>
+						<row>
+							<data:input>versicolor</data:input>
+							<data:output>1</data:output>
+						</row>
+						<row>
+							<data:input>virginica</data:input>
+							<data:output>2</data:output>
+						</row>
+					</InlineTable>
+				</MapValues>
+			</OutputField>
+			<OutputField name="probability(setosa)" optype="continuous" dataType="double" feature="probability" value="setosa"/>
+			<OutputField name="probability(versicolor)" optype="continuous" dataType="double" feature="probability" value="versicolor"/>
+			<OutputField name="probability(virginica)" optype="continuous" dataType="double" feature="probability" value="virginica"/>
+		</Output>
+		<LocalTransformations>
+			<DerivedField name="scaledFeatureVector[0]" optype="continuous" dataType="double">
+				<Apply function="*">
+					<Apply function="-">
+						<FieldRef field="Sepal_Width"/>
+						<Constant dataType="double">3.0573333333333315</Constant>
+					</Apply>
+					<Constant dataType="double">2.294281605527789</Constant>
+				</Apply>
+			</DerivedField>
+			<DerivedField name="scaledFeatureVector[1]" optype="continuous" dataType="double">
+				<Apply function="*">
+					<Apply function="-">
+						<FieldRef field="Petal_Length"/>
+						<Constant dataType="double">3.758</Constant>
+					</Apply>
+					<Constant dataType="double">0.5664765200345716</Constant>
+				</Apply>
+			</DerivedField>
+			<DerivedField name="scaledFeatureVector[2]" optype="continuous" dataType="double">
+				<Apply function="*">
+					<Apply function="-">
+						<FieldRef field="Petal_Width"/>
+						<Constant dataType="double">1.1993333333333336</Constant>
+					</Apply>
+					<Constant dataType="double">1.3119267660491627</Constant>
+				</Apply>
+			</DerivedField>
+			<DerivedField name="pcaVector[0]" optype="continuous" dataType="double">
+				<Apply function="sum">
+					<Apply function="*">
+						<FieldRef field="scaledFeatureVector[0]"/>
+						<Constant dataType="double">-0.41811772336351716</Constant>
+					</Apply>
+					<Apply function="*">
+						<FieldRef field="scaledFeatureVector[1]"/>
+						<Constant dataType="double">0.6482669984834558</Constant>
+					</Apply>
+					<Apply function="*">
+						<FieldRef field="scaledFeatureVector[2]"/>
+						<Constant dataType="double">0.6363391140630594</Constant>
+					</Apply>
+				</Apply>
+			</DerivedField>
+			<DerivedField name="pcaVector[1]" optype="continuous" dataType="double">
+				<Apply function="sum">
+					<Apply function="*">
+						<FieldRef field="scaledFeatureVector[0]"/>
+						<Constant dataType="double">-0.9067335315305658</Constant>
+					</Apply>
+					<Apply function="*">
+						<FieldRef field="scaledFeatureVector[1]"/>
+						<Constant dataType="double">-0.255519839778602</Constant>
+					</Apply>
+					<Apply function="*">
+						<FieldRef field="scaledFeatureVector[2]"/>
+						<Constant dataType="double">-0.3354756537777747</Constant>
+					</Apply>
+				</Apply>
+			</DerivedField>
+		</LocalTransformations>
+		<Node>
+			<True/>
+			<Node score="setosa" recordCount="52.0">
+				<SimplePredicate field="pcaVector[0]" operator="lessOrEqual" value="0.1772502658480951"/>
+				<ScoreDistribution value="setosa" recordCount="50.0"/>
+				<ScoreDistribution value="versicolor" recordCount="2.0"/>
+				<ScoreDistribution value="virginica" recordCount="0.0"/>
+			</Node>
+			<Node score="versicolor" recordCount="42.0">
+				<SimplePredicate field="pcaVector[0]" operator="lessOrEqual" value="0.8532348302011684"/>
+				<ScoreDistribution value="setosa" recordCount="0.0"/>
+				<ScoreDistribution value="versicolor" recordCount="42.0"/>
+				<ScoreDistribution value="virginica" recordCount="0.0"/>
+			</Node>
+			<Node score="virginica" recordCount="51.0">
+				<SimplePredicate field="pcaVector[1]" operator="lessOrEqual" value="0.8599818205292025"/>
+				<ScoreDistribution value="setosa" recordCount="0.0"/>
+				<ScoreDistribution value="versicolor" recordCount="2.0"/>
+				<ScoreDistribution value="virginica" recordCount="49.0"/>
+			</Node>
+			<Node score="versicolor" recordCount="5.0">
+				<True/>
+				<ScoreDistribution value="setosa" recordCount="0.0"/>
+				<ScoreDistribution value="versicolor" recordCount="4.0"/>
+				<ScoreDistribution value="virginica" recordCount="1.0"/>
+			</Node>
+		</Node>
+	</TreeModel>
+</PMML>
