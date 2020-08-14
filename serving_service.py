@@ -53,16 +53,26 @@ def extract_file(fname):
 # convert extracted model to PMML
 def create_PMML():
     # os.system("java -cp " + CLIENT_EXECUTABLE_PATH + " org.openscoring.client.Deployer -- " + app.config['MODEL_NAME'])
-    schema = ""
-    pipeline = ""
+    files = os.listdir("temp")
+    for i in files:
+        if ".json" in i:
+            schema = i
+        else:
+            pipeline = i
+    command = "spark-submit --master local --class org.jpmml.sparkml.Main "+ \
+            app.config['JPMML_PATH']+ " --schema-input "+"temp/"+schema +" --pipeline-input "+\
+            "temp/"+pipeline+" --pmml-output "+ app.config['PMML_OUTPUT_PATH'] + app.config['MODEL_NAME']+".pmml"
     try:
-        os.system("spark-submit --master local --class org.jpmml.sparkml.Main "+ \
-            app.config['JPMML_PATH']+ " --schema-input "+schema +" --pipeline-input "+\
-            pipeline+" -pmml-output "+ app.config['PMML_OUTPUT_PATH'] + app.config['MODEL_NAME']+".pmml")
-        print("model created")
+        os.system(command)
     except:
         print("pmml conversion failed")
-    
+        return
+    print("Model successfully extracted")
+    return
+
+# after PMML file is created, deploy model to openscoring
+def deploy_model():
+    pass
 
 @app.route('/')
 def index():
@@ -85,6 +95,8 @@ def model_upload(filename):
         extract_file(UPLOAD_FOLDER+'/'+filename)
         # create PMML
         create_PMML()
+        # deploy_model
+        deploy_model()
         # Return 201 CREATED
         return "", 201
     else:
