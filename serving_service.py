@@ -13,13 +13,13 @@ from flask import Flask,flash, render_template,abort, url_for, redirect, request
 from werkzeug.utils import secure_filename
 from flask import send_from_directory
 
-CLIENT_EXECUTABLE_PATH = "openscoring/openscoring-client/target/openscoring-client-executable-2.0-SNAPSHOT.jar"
-JPMML_PATH = "jpmml/target/jpmml-sparkml-executable-1.6-SNAPSHOT.jar"
+CLIENT_EXEC_FILE_PATH = "openscoring/openscoring-client/target/openscoring-client-executable-2.0-SNAPSHOT.jar"
+JPMML_EXEC_FILE_PATH = "jpmml/target/jpmml-sparkml-executable-1.6-SNAPSHOT.jar"
 PMML_OUTPUT_PATH = "converted_models/"
 ALLOWED_EXTENSIONS = {'tar', 'gz'}
 UPLOAD_FOLDER="./models_archive"
 UNZIP_FOLDER="./temp"
-SERVER_ADDRESS = "http://localhost:8080/openscoring/model/"
+SERVER = "http://localhost:8080/openscoring/model/"
 
 # initializing the App and database
 app = Flask(__name__)
@@ -28,10 +28,10 @@ app.secret_key = b'_5#y2L"FfasfsdQ8z\n\xec]/'
 app.config.from_object(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['ALLOWED_EXTENSIONS'] = ALLOWED_EXTENSIONS
-app.config['CLIENT_EXECUTABLE_PATH'] = CLIENT_EXECUTABLE_PATH
+app.config['CLIENT_PATH'] = CLIENT_EXEC_FILE_PATH
 app.config['UNZIP_FOLDER'] = UNZIP_FOLDER
-app.config['SERVER_ADDRESS'] = SERVER_ADDRESS
-app.config['JPMML_PATH'] = JPMML_PATH
+app.config['SERVER'] = SERVER
+app.config['JPMML_PATH'] = JPMML_EXEC_FILE_PATH
 app.config['PMML_OUTPUT_PATH'] = PMML_OUTPUT_PATH
 
 # check extension
@@ -51,35 +51,71 @@ def extract_file(fname):
         tar.close()
 
 # convert extracted model to PMML
-def create_PMML():
-    # os.system("java -cp " + CLIENT_EXECUTABLE_PATH + " org.openscoring.client.Deployer -- " + app.config['MODEL_NAME'])
+def create_PMML(model_name):
     files = os.listdir("temp")
     for i in files:
         if ".json" in i:
             schema = i
         else:
             pipeline = i
+
+    # the command to convert SPARK model to PMML 
     command = "spark-submit --master local --class org.jpmml.sparkml.Main "+ \
             app.config['JPMML_PATH']+ " --schema-input "+"temp/"+schema +" --pipeline-input "+\
-            "temp/"+pipeline+" --pmml-output "+ app.config['PMML_OUTPUT_PATH'] + app.config['MODEL_NAME']+".pmml"
+            "temp/"+pipeline+" --pmml-output "+ app.config['PMML_OUTPUT_PATH'] + model_name+".pmml"
     try:
         os.system(command)
     except:
         print("pmml conversion failed")
         return
+    # clean temporary files created
+    os.system("rm -r temp/*")
     print("Model successfully extracted")
     return
 
 # after PMML file is created, deploy model to openscoring
-def deploy_model():
-    pass
+def deploy_model(model_name):
+    # the command to deploy PMML file to openscoring
+    command = "java -cp "+app.config['CLIENT_PATH']+" org.openscoring.client.Deployer --model "\
+        + app.config['SERVER']+model_name+" --file "+ app.config['PMML_OUTPUT_PATH'] \
+        + model_name+".pmml"
+    try:
+        os.system(command)
+    except:
+        print("could not deploy")
+        return
+    print("Model deployed")
+    return
+
+# on request, undeploy model
+def undeploy_model(model_name):
+    # the command to deploy PMML file to openscoring
+    command = "java -cp "+app.config['CLIENT_PATH']+" org.openscoring.client.Undeployer --model "\
+        + app.config['SERVER']+model_name
+    try:
+        os.system(command)
+    except:
+        print("could not deploy")
+        return
+    print("Model deployed")
+    return
+
+# purge model files 
+def purge_model(model_name):
+    # remove PMML
+    os.system("rm converted_models/"+model_name+".pmml")
+    # remove tar/tar.gz files
+    os.system("rm model_archive/"+model_name+".tar*")
+    return
+
+######################################################################33
 
 @app.route('/')
 def index():
     return ("service is successfully hosted")
 
 # route to upload model -- will be called by webserver
-@app.route('/model_upload/<filename>', methods=['POST'])
+@app.route('/deploy/<filename>', methods=['POST'])
 def model_upload(filename):
     # filter out server code injection attempts
     filename = secure_filename(filename)
@@ -90,23 +126,41 @@ def model_upload(filename):
             fp.write(request.data)
         # set model name
         model_name = filename.split('.')[0]
-        app.config['MODEL_NAME'] = model_name
         # unzip model
         extract_file(UPLOAD_FOLDER+'/'+filename)
         # create PMML
-        create_PMML()
+        create_PMML(model_name)
         # deploy_model
-        deploy_model()
+        deploy_model(model_name)
         # Return 201 CREATED
         return "", 201
     else:
         abort(400, "invalid upload")
 
-
+# route to download uploaded models
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'],
                                filename)
+
+# route to delete uploaded models
+@app.route('/delete/<filename>', methods=["POST","GET"])
+def delete_model(filename):
+    # filter out server code injection attempts
+    filename = secure_filename(filename)
+    model_name = filename.split('.')[0]
+    # if request not empty
+    if allowed_file(filename):
+        # undeploy model
+        undeploy_model(model_name)
+        # remove model files
+        purge_model(model_name)
+    # Return 201 OK
+        return "", 200
+    else:
+        abort(400, "invalid request")
+    
+    
 
 if __name__ == "__main__":
     app.run(debug=True)
